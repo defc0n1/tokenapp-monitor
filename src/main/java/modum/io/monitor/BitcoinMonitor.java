@@ -18,6 +18,7 @@ import org.bitcoinj.core.TransactionConfidence.Listener;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.listeners.DownloadProgressTracker;
 import org.bitcoinj.net.discovery.DnsDiscovery;
+import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.wallet.Wallet;
@@ -28,13 +29,14 @@ public class BitcoinMonitor {
   private final static Logger LOG = LoggerFactory.getLogger(BitcoinMonitor.class);
 
   private final Context context;
-  private final NetworkParameters chainParams = TestNet3Params.get();
+  private final NetworkParameters chainParams;
   private final Wallet wallet;
   private final PeerGroup peerGroup;
   private Set<TransactionOutput> processedUTXOs = new HashSet<>();
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public BitcoinMonitor() throws Exception {
+  public BitcoinMonitor(String bitcoinNetwork) throws Exception {
+    chainParams = BitcoinNet.getNetworkParams(BitcoinNet.of(bitcoinNetwork));
     context = new Context(chainParams);
     File blockStoreFile = Files.createTempFile("chain", "tmp").toFile();
     blockStoreFile.deleteOnExit();
@@ -45,7 +47,11 @@ public class BitcoinMonitor {
     peerGroup = new PeerGroup(context, blockChain);
     blockChain.addWallet(wallet);
     peerGroup.addWallet(wallet);
-    peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
+
+    // Regtest has no peer-to-peer functionality
+    if (!chainParams.equals(RegTestParams.get()))
+      peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
+
     addCoinsReceivedListener();
   }
 

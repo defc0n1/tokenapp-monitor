@@ -13,6 +13,7 @@ public class Application {
   private final Long START_BLOCK;
   private final String ETHER_FULLNODE_URL;
   private final String JDBC_URL;
+  private final String MODUM_TOKENAPP_BITCOIN_NETWORK;
 
   private EthereumMonitor ethereumMonitor;
   private BitcoinMonitor bitcoinMonitor;
@@ -21,6 +22,7 @@ public class Application {
     START_BLOCK = Long.valueOf(System.getenv("START_BLOCK_ETHER"));
     ETHER_FULLNODE_URL = System.getenv("ETHER_FULLNODE_URL");
     JDBC_URL = System.getenv("JDBC_URL");
+    MODUM_TOKENAPP_BITCOIN_NETWORK = System.getenv("MODUM_TOKENAPP_BITCOIN_NETWORK");
   }
 
   public static void main(String[] args) throws Exception {
@@ -30,7 +32,7 @@ public class Application {
 
   private void init() throws Exception {
     ethereumMonitor = new EthereumMonitor(ETHER_FULLNODE_URL);
-    bitcoinMonitor = new BitcoinMonitor();
+    bitcoinMonitor = new BitcoinMonitor(MODUM_TOKENAPP_BITCOIN_NETWORK);
 
     new DatabaseWatcher(JDBC_URL,
         newBitcoinAddress -> bitcoinMonitor .addMonitoredAddress(newBitcoinAddress,
