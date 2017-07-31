@@ -7,18 +7,22 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.bitcoinj.core.Address;
+import org.bitcoinj.core.Block;
 import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerGroup;
+import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionConfidence.Listener;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.listeners.DownloadProgressTracker;
 import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.params.RegTestParams;
+import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.wallet.Wallet;
 import org.slf4j.Logger;
@@ -31,6 +35,7 @@ public class BitcoinMonitor {
   private final NetworkParameters chainParams;
   private final Wallet wallet;
   private final PeerGroup peerGroup;
+  private final SPVBlockStore blockStore;
   private Set<TransactionOutput> processedUTXOs = new HashSet<>();
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
@@ -41,7 +46,7 @@ public class BitcoinMonitor {
     blockStoreFile.deleteOnExit();
     if (blockStoreFile.exists()) blockStoreFile.delete();
     wallet = new Wallet(context);
-    SPVBlockStore blockStore = new SPVBlockStore(chainParams, blockStoreFile);
+    blockStore = new SPVBlockStore(chainParams, blockStoreFile);
     BlockChain blockChain = new BlockChain(context, blockStore);
     peerGroup = new PeerGroup(context, blockChain);
     blockChain.addWallet(wallet);
@@ -112,11 +117,14 @@ public class BitcoinMonitor {
               Listener listener = new Listener() {
                 @Override
                 public void onConfidenceChanged(TransactionConfidence confidence, ChangeReason reason) {
-                  if (confidence.getConfidenceType().equals(BUILDING)) {
-                    coinsReceived(utxo);
-                    tx.getConfidence().removeEventListener(this);
-                  } else if (confidence.getConfidenceType().equals(DEAD) || confidence.getConfidenceType().equals(IN_CONFLICT)) {
-                    tx.getConfidence().removeEventListener(this);
+                  if (!processedUTXOs.contains(utxo)) {
+                    if (confidence.getConfidenceType().equals(BUILDING)) {
+                      coinsReceived(utxo);
+                      tx.getConfidence().removeEventListener(this);
+                    } else if (confidence.getConfidenceType().equals(DEAD) || confidence
+                        .getConfidenceType().equals(IN_CONFLICT)) {
+                      tx.getConfidence().removeEventListener(this);
+                    }
                   }
                 }
               };
@@ -133,13 +141,35 @@ public class BitcoinMonitor {
    * @param utxo The transaction output we received
    */
   private void coinsReceived(TransactionOutput utxo) {
-    LOG.info("\n{} satoshi sent from tx {}\n", utxo.getValue(), utxo.getParentTransaction().getHashAsString());
     long satoshi = utxo.getValue().getValue();
-    long timestamp = 0L; // TODO
+
+    // Retrieve the timestamp from the first block that this transaction was seen in
+    long timestamp = utxo.getParentTransaction().getAppearsInHashes().keySet().stream()
+        .map((blockHash) -> {
+          try {
+            return blockStore.get(blockHash);
+          } catch (BlockStoreException e) {
+            return null; // This can happen if the transaction was seen in a side-chain
+          }
+        })
+        .filter(Objects::nonNull)
+        .map(StoredBlock::getHeader)
+        .map(Block::getTime)
+        .mapToLong(date -> (date.getTime() / 1000L))
+        .min().orElseThrow(() -> new RuntimeException("Could not get time of block"));
+
     BigDecimal USDperBTC = ExchangeRateService.getUSDPerBTC(timestamp);
     BigDecimal usdReceived = BigDecimal.valueOf(satoshi)
         .multiply(USDperBTC)
         .divide(BigDecimal.valueOf(100000000L), BigDecimal.ROUND_DOWN);
+
+    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid",
+        usdReceived,
+        utxo.getValue(),
+        timestamp,
+        USDperBTC,
+        utxo.getParentTransaction().getHashAsString());
+
     processedUTXOs.add(utxo);
     totalRaised = totalRaised.add(usdReceived);
   }
