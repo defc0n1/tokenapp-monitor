@@ -3,21 +3,21 @@ package modum.io.monitor;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
+import javax.sql.DataSource;
 
 public class DatabaseWatcher {
-  private Connection conn;
   private PostgresTriggerListener listener;
+  private final DataSource dataSource;
 
-  DatabaseWatcher(Connection conn, TriggerAction newBitcoinAddress, TriggerAction newEtherAddress)
+  DatabaseWatcher(DataSource dataSource, TriggerAction newBitcoinAddress, TriggerAction newEtherAddress)
       throws SQLException {
-
-    this.conn = conn;
+    this.dataSource = dataSource;
     setUpTrigger();
 
     Map<String, TriggerAction> actionMap = new HashMap<>();
     actionMap.put("bitcoin", newBitcoinAddress);
     actionMap.put("ether", newEtherAddress);
-    listener = new PostgresTriggerListener(conn, actionMap);
+    listener = new PostgresTriggerListener(dataSource.getConnection(), actionMap);
     listener.start();
   }
 
@@ -26,7 +26,7 @@ public class DatabaseWatcher {
   }
 
   private void setUpTrigger() throws SQLException {
-    Statement statement = conn.createStatement();
+    Statement statement = dataSource.getConnection().createStatement();
     String createFunction = ""
         + "CREATE OR REPLACE FUNCTION notify_new_payin_address()\n"
         + "RETURNS TRIGGER AS $$\n"
