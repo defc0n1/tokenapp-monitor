@@ -69,8 +69,12 @@ public class Application {
       String ethereumAddress = rs.getString("pay_in_ether_address");
       Date creationDate = rs.getDate("creation_date");
       long timestamp = creationDate.getTime() / 1000L;
-      bitcoinMonitor.addMonitoredAddress(bitcoinAddress, timestamp);
-      ethereumMonitor.addMonitoredAddress(ethereumAddress);
+
+      if (bitcoinAddress != null)
+        bitcoinMonitor.addMonitoredAddress(bitcoinAddress, timestamp);
+
+      if (ethereumAddress != null)
+        ethereumMonitor.addMonitoredAddress(ethereumAddress);
     }
   }
 
