@@ -3,24 +3,20 @@ package modum.io.monitor;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
 public class DatabaseWatcher {
   private Connection conn;
   private PostgresTriggerListener listener;
 
-  DatabaseWatcher(String jdbcURL, TriggerAction newBitcoinAddress, TriggerAction newEtherAddress)
+  DatabaseWatcher(Connection conn, TriggerAction newBitcoinAddress, TriggerAction newEtherAddress)
       throws SQLException {
-    Properties props = new Properties();
-    props.setProperty("user", System.getenv("DATASOURCE_USERNAME"));
-    props.setProperty("password", System.getenv("DATASOURCE_PASSWORD"));
-    conn = DriverManager.getConnection(jdbcURL, props);
+
+    this.conn = conn;
     setUpTrigger();
 
     Map<String, TriggerAction> actionMap = new HashMap<>();
     actionMap.put("bitcoin", newBitcoinAddress);
     actionMap.put("ether", newEtherAddress);
-
     listener = new PostgresTriggerListener(conn, actionMap);
     listener.start();
   }
