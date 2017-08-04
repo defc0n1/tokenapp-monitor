@@ -5,14 +5,18 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 
+/***
+ * Class that watches the (postgres) database for NOTIFYs of 'ether' and 'bitcoin' and triggers
+ * the passed-in actions.
+ */
 public class DatabaseWatcher {
   private PostgresTriggerListener listener;
   private final DataSource dataSource;
 
-  DatabaseWatcher(DataSource dataSource, TriggerAction newBitcoinAddress, TriggerAction newEtherAddress)
-      throws SQLException {
+  DatabaseWatcher(DataSource dataSource, TriggerAction newBitcoinAddress,
+      TriggerAction newEtherAddress, boolean createSchema) throws SQLException {
     this.dataSource = dataSource;
-    setUpTrigger();
+    if (createSchema) setUpTrigger();
 
     Map<String, TriggerAction> actionMap = new HashMap<>();
     actionMap.put("bitcoin", newBitcoinAddress);
@@ -27,7 +31,7 @@ public class DatabaseWatcher {
 
   private void setUpTrigger() throws SQLException {
     Statement statement = dataSource.getConnection().createStatement();
-    String createFunction = ""
+    statement.execute(""
         + "CREATE OR REPLACE FUNCTION notify_new_payin_address()\n"
         + "RETURNS TRIGGER AS $$\n"
         + "BEGIN\n"
@@ -35,15 +39,13 @@ public class DatabaseWatcher {
         + "  PERFORM pg_notify(CAST('ether' AS TEXT),NEW.pay_in_ether_address);\n"
         + "  RETURN NEW;\n"
         + "END;\n"
-        + "$$ LANGUAGE 'plpgsql';";
-    statement.execute("DROP TRIGGER IF EXISTS notify_new_payin_address ON investor;");
-    String createTrigger = ""
-        + "CREATE TRIGGER notify_new_payin_address\n"
-        + "  AFTER UPDATE OF pay_in_ether_address, pay_in_bitcoin_address ON investor\n"
-        + "  FOR EACH ROW\n"
-        + "  EXECUTE PROCEDURE notify_new_payin_address()";
-    statement.execute(createFunction);
-    statement.execute(createTrigger);
+        + "$$ LANGUAGE 'plpgsql';");
+    statement.execute(
+        "DROP TRIGGER IF EXISTS notify_new_payin_address ON investor;\n"
+            + "CREATE TRIGGER notify_new_payin_address\n"
+            + "  AFTER UPDATE OF pay_in_ether_address, pay_in_bitcoin_address ON investor\n"
+            + "  FOR EACH ROW\n"
+            + "  EXECUTE PROCEDURE notify_new_payin_address()");
     statement.close();
   }
 

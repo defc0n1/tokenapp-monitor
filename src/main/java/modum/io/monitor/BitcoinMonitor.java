@@ -5,29 +5,30 @@ import static org.bitcoinj.core.TransactionConfidence.ConfidenceType.*;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.sql.SQLException;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 import org.bitcoinj.core.Address;
-import org.bitcoinj.core.Block;
 import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerGroup;
-import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionConfidence.Listener;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.listeners.DownloadProgressTracker;
 import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.params.RegTestParams;
-import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.wallet.Wallet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Bitconin SPV wallet that scans the blockchain transactions for watched addresses.
+ * Keeps track of the total amount in USD send to any watched address.
+ */
 public class BitcoinMonitor {
   private final static Logger LOG = LoggerFactory.getLogger(BitcoinMonitor.class);
 
@@ -36,10 +37,12 @@ public class BitcoinMonitor {
   private final Wallet wallet;
   private final PeerGroup peerGroup;
   private final SPVBlockStore blockStore;
+  private final ExchangeRateService fxService;
   private Set<TransactionOutput> processedUTXOs = new HashSet<>();
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public BitcoinMonitor(String bitcoinNetwork) throws Exception {
+  public BitcoinMonitor(ExchangeRateService fxService, String bitcoinNetwork) throws Exception {
+    this.fxService = fxService;
     chainParams = BitcoinNet.getNetworkParams(BitcoinNet.of(bitcoinNetwork));
     context = new Context(chainParams);
     File blockStoreFile = Files.createTempFile("chain", "tmp").toFile();
@@ -47,6 +50,7 @@ public class BitcoinMonitor {
     if (blockStoreFile.exists()) blockStoreFile.delete();
     wallet = new Wallet(context);
     blockStore = new SPVBlockStore(chainParams, blockStoreFile);
+    // TODO: Checkpointing to speed up start-up phase
     BlockChain blockChain = new BlockChain(context, blockStore);
     peerGroup = new PeerGroup(context, blockChain);
     blockChain.addWallet(wallet);
@@ -89,6 +93,7 @@ public class BitcoinMonitor {
       }
     };
     peerGroup.startBlockChainDownload(downloadListener);
+    LOG.info("Downloading SPV blockchain...");
     downloadListener.await();
   }
 
@@ -113,7 +118,7 @@ public class BitcoinMonitor {
 
               // If pending or unknown we add a confidence changed listener and wait for block inclusion
             } else if (BitcoinUtils.isPending(tx) || BitcoinUtils.isUnknown(tx)) {
-              LOG.info("Pending: {} coins received in {}", utxo.getValue(), tx.getHashAsString());
+              LOG.info("Pending: {} satoshi received in {}", utxo.getValue(), tx.getHashAsString());
               Listener listener = new Listener() {
                 @Override
                 public void onConfidenceChanged(TransactionConfidence confidence, ChangeReason reason) {
@@ -143,30 +148,23 @@ public class BitcoinMonitor {
   private void coinsReceived(TransactionOutput utxo) {
     long satoshi = utxo.getValue().getValue();
 
-    // Retrieve the timestamp from the first block that this transaction was seen in
-    long timestamp = utxo.getParentTransaction().getAppearsInHashes().keySet().stream()
-        .map((blockHash) -> {
-          try {
-            return blockStore.get(blockHash);
-          } catch (BlockStoreException e) {
-            return null; // This can happen if the transaction was seen in a side-chain
-          }
-        })
-        .filter(Objects::nonNull)
-        .map(StoredBlock::getHeader)
-        .map(Block::getTime)
-        .mapToLong(date -> (date.getTime() / 1000L))
-        .min().orElseThrow(() -> new RuntimeException("Could not get time of block"));
+    long blockHeight = utxo.getParentTransaction().getConfidence().getAppearedAtChainHeight();
 
-    BigDecimal USDperBTC = ExchangeRateService.getUSDPerBTC(timestamp);
+    BigDecimal USDperBTC = null;
+    try {
+      USDperBTC = fxService.getUSDPerBTC(blockHeight);
+    } catch (SQLException e) {
+      LOG.error("Could not fetch exchange rate for utxo in tx {} with satoshi value {}. {} {}",
+          utxo.getParentTransaction().getHashAsString(), satoshi, e.getMessage(), e.getCause());
+    }
     BigDecimal usdReceived = BigDecimal.valueOf(satoshi)
         .multiply(USDperBTC)
-        .divide(BigDecimal.valueOf(100000000L), BigDecimal.ROUND_DOWN);
+        .divide(BigDecimal.valueOf(100_000_000L), BigDecimal.ROUND_DOWN);
 
-    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid",
+    LOG.info("Received {} USD / {} satoshi / {} blockHeight / {} fx-rate / {} txid",
         usdReceived,
         utxo.getValue(),
-        timestamp,
+        blockHeight,
         USDperBTC,
         utxo.getParentTransaction().getHashAsString());
 
