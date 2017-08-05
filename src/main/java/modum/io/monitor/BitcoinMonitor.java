@@ -3,23 +3,29 @@ package modum.io.monitor;
 import static org.bitcoinj.core.TransactionConfidence.ConfidenceType.*;
 
 import java.io.File;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.Inet4Address;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.bitcoinj.core.Address;
+import org.bitcoinj.core.Block;
 import org.bitcoinj.core.BlockChain;
+import org.bitcoinj.core.CheckpointManager;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerGroup;
+import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionConfidence.Listener;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.listeners.DownloadProgressTracker;
-import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.params.RegTestParams;
+import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.wallet.Wallet;
 import org.slf4j.Logger;
@@ -50,15 +56,25 @@ public class BitcoinMonitor {
     if (blockStoreFile.exists()) blockStoreFile.delete();
     wallet = new Wallet(context);
     blockStore = new SPVBlockStore(chainParams, blockStoreFile);
-    // TODO: Checkpointing to speed up start-up phase
+    InputStream checkPoints = ClassLoader.getSystemResourceAsStream("checkpoints.txt");
+    CheckpointManager.checkpoint(chainParams, checkPoints, blockStore, 1498867200L);
     BlockChain blockChain = new BlockChain(context, blockStore);
     peerGroup = new PeerGroup(context, blockChain);
     blockChain.addWallet(wallet);
     peerGroup.addWallet(wallet);
 
     // Regtest has no peer-to-peer functionality
-    if (!chainParams.equals(RegTestParams.get()))
-      peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
+    if (!chainParams.equals(RegTestParams.get())) {
+      //peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
+      peerGroup.addAddress(Inet4Address.getByName("192.41.136.217"));
+      peerGroup.addAddress(Inet4Address.getByName("212.51.140.183"));
+      peerGroup.addAddress(Inet4Address.getByName("85.5.108.217"));
+      peerGroup.addAddress(Inet4Address.getByName("212.51.159.248"));
+      peerGroup.addAddress(Inet4Address.getByName("83.76.178.6"));
+      peerGroup.addAddress(Inet4Address.getByName("213.144.135.202"));
+      peerGroup.addAddress(Inet4Address.getByName("194.15.231.236"));
+      peerGroup.addAddress(Inet4Address.getByName("95.183.48.62"));
+    }
 
     addCoinsReceivedListener();
   }
@@ -148,11 +164,24 @@ public class BitcoinMonitor {
   private void coinsReceived(TransactionOutput utxo) {
     long satoshi = utxo.getValue().getValue();
 
-    long blockHeight = utxo.getParentTransaction().getConfidence().getAppearedAtChainHeight();
+    // Retrieve the timestamp from the first block that this transaction was seen in
+    long timestamp = utxo.getParentTransaction().getAppearsInHashes().keySet().stream()
+        .map((blockHash) -> {
+          try {
+            return blockStore.get(blockHash);
+          } catch (BlockStoreException e) {
+            return null; // This can happen if the transaction was seen in a side-chain
+          }
+        })
+        .filter(Objects::nonNull)
+        .map(StoredBlock::getHeader)
+        .map(Block::getTime)
+        .mapToLong(date -> (date.getTime() / 1000L))
+        .min().orElseThrow(() -> new RuntimeException("Could not get time of block"));
 
     BigDecimal USDperBTC = null;
     try {
-      USDperBTC = fxService.getUSDPerBTC(blockHeight);
+      USDperBTC = fxService.getUSDPerBTC(timestamp);
     } catch (SQLException e) {
       LOG.error("Could not fetch exchange rate for utxo in tx {} with satoshi value {}. {} {}",
           utxo.getParentTransaction().getHashAsString(), satoshi, e.getMessage(), e.getCause());
@@ -161,10 +190,10 @@ public class BitcoinMonitor {
         .multiply(USDperBTC)
         .divide(BigDecimal.valueOf(100_000_000L), BigDecimal.ROUND_DOWN);
 
-    LOG.info("Received {} USD / {} satoshi / {} blockHeight / {} fx-rate / {} txid",
+    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid",
         usdReceived,
         utxo.getValue(),
-        blockHeight,
+        timestamp,
         USDperBTC,
         utxo.getParentTransaction().getHashAsString());
 

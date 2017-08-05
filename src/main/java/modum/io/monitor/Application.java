@@ -10,6 +10,7 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
+import org.apache.http.conn.HttpHostConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +30,7 @@ public class Application {
   private BitcoinMonitor bitcoinMonitor;
   private ExchangeRateService fxService;
   private HikariDataSource databaseSource;
+  private DatabaseWatcher databaseWatcher;
 
   public Application() throws SQLException {
     // Required configurations
@@ -49,10 +51,19 @@ public class Application {
 
   public static void main(String[] args) throws Exception {
     Application app = new Application();
-    app.initDatabase();
-    app.initExchangeRateService();
-    app.initMonitors();
-    app.initRoutes();
+    app.init();
+  }
+
+  private void init() throws Exception {
+    try {
+      initDatabase();
+      initExchangeRateService();
+      initMonitors();
+      initRoutes();
+    } catch (HttpHostConnectException e) {
+      LOG.error("Could not connect to ethereum fullnode on {}: {}", ETHER_FULLNODE_URL, e.getMessage());
+      System.exit(1);
+    }
   }
 
   private void initDatabase() {
@@ -67,7 +78,7 @@ public class Application {
     ethereumMonitor = new EthereumMonitor(fxService, ETHER_FULLNODE_URL);
     bitcoinMonitor = new BitcoinMonitor(fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
 
-    new DatabaseWatcher(databaseSource,
+    databaseWatcher = new DatabaseWatcher(databaseSource,
         newBitcoinAddress -> {
           bitcoinMonitor.addMonitoredAddress(newBitcoinAddress, Instant.now().getEpochSecond());
         },
@@ -75,6 +86,7 @@ public class Application {
           ethereumMonitor.addMonitoredAddress(newEthereumAddress);
         },
         MODUM_TOKENAPP_CREATE_SCHEMA);
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> databaseWatcher.stop()));
 
     monitorExistingAddresses();
 

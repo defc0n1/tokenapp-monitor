@@ -47,7 +47,11 @@ public class PostgresTriggerListener extends Thread {
           for (PGNotification notification : notifications) {
             TriggerAction action = actions.get(notification.getName());
             if (action != null) {
-              action.run(notification.getParameter());
+              try {
+                action.run(notification.getParameter());
+              } catch (Throwable e) {
+                LOG.error("Error during trigger: {}", e.getMessage());
+              }
             } else {
               LOG.error("Warning: no modum.io.monitor.TriggerAction provided for {}",
                   notification.getName());
