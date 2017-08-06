@@ -24,7 +24,9 @@ import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionConfidence.Listener;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.listeners.DownloadProgressTracker;
-import org.bitcoinj.params.RegTestParams;
+import org.bitcoinj.net.discovery.DnsDiscovery;
+import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.wallet.Wallet;
@@ -64,8 +66,7 @@ public class BitcoinMonitor {
     peerGroup.addWallet(wallet);
 
     // Regtest has no peer-to-peer functionality
-    if (!chainParams.equals(RegTestParams.get())) {
-      //peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
+    if (chainParams.equals(MainNetParams.get())) {
       peerGroup.addAddress(Inet4Address.getByName("192.41.136.217"));
       peerGroup.addAddress(Inet4Address.getByName("212.51.140.183"));
       peerGroup.addAddress(Inet4Address.getByName("85.5.108.217"));
@@ -74,6 +75,8 @@ public class BitcoinMonitor {
       peerGroup.addAddress(Inet4Address.getByName("213.144.135.202"));
       peerGroup.addAddress(Inet4Address.getByName("194.15.231.236"));
       peerGroup.addAddress(Inet4Address.getByName("95.183.48.62"));
+    } else if (chainParams.equals(TestNet3Params.get())) {
+      peerGroup.addPeerDiscovery(new DnsDiscovery(chainParams));
     }
 
     addCoinsReceivedListener();
