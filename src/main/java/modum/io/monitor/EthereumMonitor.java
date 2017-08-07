@@ -107,7 +107,6 @@ class EthereumMonitor {
       web3.catchUpToLatestAndSubscribeToNewTransactionsObservable(
           new DefaultBlockParameterNumber(startBlock))
           .subscribe(tx -> {
-            LOG.info(tx.getBlockNumber().toString());
             if (monitoredAddresses.get(tx.getTo()) != null) {
               // Money was paid to a monitored address
               try {
