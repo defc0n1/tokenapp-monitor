@@ -2,6 +2,7 @@ package modum.io.monitor;
 
 import static org.bitcoinj.core.TransactionConfidence.ConfidenceType.*;
 
+import com.subgraph.orchid.encoders.Hex;
 import java.io.File;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -17,6 +18,7 @@ import org.bitcoinj.core.Block;
 import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.CheckpointManager;
 import org.bitcoinj.core.Context;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerGroup;
 import org.bitcoinj.core.StoredBlock;
@@ -58,8 +60,13 @@ public class BitcoinMonitor {
     if (blockStoreFile.exists()) blockStoreFile.delete();
     wallet = new Wallet(context);
     blockStore = new SPVBlockStore(chainParams, blockStoreFile);
-    InputStream checkPoints = ClassLoader.getSystemResourceAsStream("checkpoints.txt");
-    CheckpointManager.checkpoint(chainParams, checkPoints, blockStore, 1498867200L);
+    if (chainParams.equals(MainNetParams.get())) {
+      InputStream checkPoints = ClassLoader.getSystemResourceAsStream("checkpoints.txt");
+      CheckpointManager.checkpoint(chainParams, checkPoints, blockStore, 1498867200L);
+    } else if (chainParams.equals(TestNet3Params.get())) {
+      InputStream checkPoints = ClassLoader.getSystemResourceAsStream("checkpoints-testnet.txt");
+      CheckpointManager.checkpoint(chainParams, checkPoints, blockStore, 1498867200L);
+    }
     BlockChain blockChain = new BlockChain(context, blockStore);
     peerGroup = new PeerGroup(context, blockChain);
     blockChain.addWallet(wallet);
@@ -83,13 +90,15 @@ public class BitcoinMonitor {
   }
 
   /**
-   * Add an address we want to monitor
-   * @param addressString Bitcoin address in Base58 String
-   * @param timestamp Timestamp in seconds when this address was created
+   * Add a public key we want to monitor
+   * @param publicKey Bitcoin public key as hex string
+   * @param timestamp Timestamp in seconds when this key was created
    */
-  public void addMonitoredAddress(String addressString, long timestamp) {
+  public void addMonitoredPublicKey(String publicKey, long timestamp) {
+    final Address address = ECKey.fromPublicOnly(Hex.decode(publicKey))
+        .toAddress(chainParams);
+    final String addressString = address.toBase58();
     LOG.info("Add monitored Bitcoin Address: {}", addressString);
-    Address address = Address.fromBase58(chainParams, addressString);
     wallet.addWatchedAddress(address, timestamp);
   }
 

@@ -29,6 +29,7 @@ public class Application {
   private EthereumMonitor ethereumMonitor;
   private BitcoinMonitor bitcoinMonitor;
   private ExchangeRateService fxService;
+  private UserService userService;
   private HikariDataSource databaseSource;
   private DatabaseWatcher databaseWatcher;
 
@@ -58,12 +59,17 @@ public class Application {
     try {
       initDatabase();
       initExchangeRateService();
+      initUserService();
       initMonitors();
       initRoutes();
     } catch (HttpHostConnectException e) {
       LOG.error("Could not connect to ethereum fullnode on {}: {}", ETHER_FULLNODE_URL, e.getMessage());
       System.exit(1);
     }
+  }
+
+  private void initUserService() {
+    this.userService = new UserService(databaseSource);
   }
 
   private void initDatabase() {
@@ -75,15 +81,15 @@ public class Application {
   }
 
   private void initMonitors() throws Exception {
-    ethereumMonitor = new EthereumMonitor(fxService, ETHER_FULLNODE_URL);
+    ethereumMonitor = new EthereumMonitor(userService, fxService, ETHER_FULLNODE_URL);
     bitcoinMonitor = new BitcoinMonitor(fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
 
     databaseWatcher = new DatabaseWatcher(databaseSource,
         newBitcoinAddress -> {
-          bitcoinMonitor.addMonitoredAddress(newBitcoinAddress, Instant.now().getEpochSecond());
+          bitcoinMonitor.addMonitoredPublicKey(newBitcoinAddress, Instant.now().getEpochSecond());
         },
         newEthereumAddress -> {
-          ethereumMonitor.addMonitoredAddress(newEthereumAddress);
+          ethereumMonitor.addMonitoredEtherPublicKey(newEthereumAddress);
         },
         MODUM_TOKENAPP_CREATE_SCHEMA);
     Runtime.getRuntime().addShutdownHook(new Thread(() -> databaseWatcher.stop()));
@@ -103,19 +109,19 @@ public class Application {
   private void monitorExistingAddresses() throws SQLException {
     Statement stm = databaseSource.getConnection().createStatement();
     ResultSet rs = stm.executeQuery(""
-        + "SELECT pay_in_bitcoin_address, pay_in_ether_address, creation_date FROM investor;");
+        + "SELECT pay_in_bitcoin_public_key, pay_in_ether_public_key, creation_date FROM investor;");
 
     while(rs.next()) {
-      String bitcoinAddress = rs.getString("pay_in_bitcoin_address");
-      String ethereumAddress = rs.getString("pay_in_ether_address");
+      String bitcoinPublicKey = rs.getString("pay_in_bitcoin_public_key");
+      String etherPublicKey = rs.getString("pay_in_ether_public_key");
       Date creationDate = rs.getDate("creation_date");
       long timestamp = creationDate.getTime() / 1000L;
 
-      if (bitcoinAddress != null)
-        bitcoinMonitor.addMonitoredAddress(bitcoinAddress, timestamp);
+      if (bitcoinPublicKey != null)
+        bitcoinMonitor.addMonitoredPublicKey(bitcoinPublicKey, timestamp);
 
-      if (ethereumAddress != null)
-        ethereumMonitor.addMonitoredAddress(ethereumAddress);
+      if (etherPublicKey != null)
+        ethereumMonitor.addMonitoredEtherPublicKey(etherPublicKey);
     }
   }
 

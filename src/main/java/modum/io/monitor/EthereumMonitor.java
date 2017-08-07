@@ -7,8 +7,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.protocol.Web3j;
@@ -27,16 +28,18 @@ class EthereumMonitor {
 
   private final Web3j web3;
   private final ExchangeRateService fxService;
+  private final UserService userService;
   private boolean started = false;
-  private Set<String> monitoredAddresses = new HashSet<>();
+  private Map<String, String> monitoredAddresses = new HashMap<>(); // public key -> address
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public EthereumMonitor(ExchangeRateService fxService, String ipcPath) {
+  public EthereumMonitor(UserService userService, ExchangeRateService fxService, String ipcPath) {
+    this.userService = userService;
     this.fxService = fxService;
     this.web3 = Web3j.build(new HttpService(ipcPath));
   }
 
-  public void fundsReceived(BigInteger wei, Long blockHeight) {
+  public void fundsReceived(String address, BigInteger wei, Long blockHeight) {
     BigDecimal usd = null;
     try {
       usd = fxService.weiToUSD(wei, blockHeight);
@@ -45,8 +48,16 @@ class EthereumMonitor {
           blockHeight, e.getMessage(), e.getCause());
       return;
     }
+    String email = null;
+    try {
+      email = userService.getEmailForEtherPublicKey(monitoredAddresses.get(address));
+    } catch (SQLException e) {
+      LOG.error("Could not fetch email address {}. {} {}",
+          address, e.getMessage(), e.getCause());
+    }
     totalRaised = totalRaised.add(usd);
-    LOG.info("Payin: {} ether / {} USD ", Convert.fromWei(new BigDecimal(wei), Unit.ETHER).toString(), usd);
+    LOG.info("Payin: {} ether / {} USD / User: {} / Block: {}", Convert.fromWei(new BigDecimal(wei),
+        Unit.ETHER).toString(), usd, email, blockHeight);
     LOG.info("New total: {} USD", totalRaised);
   }
 
@@ -54,9 +65,17 @@ class EthereumMonitor {
     return totalRaised.setScale(0, BigDecimal.ROUND_UP).longValue();
   }
 
-  public void addMonitoredAddress(String addressString) {
+  /**
+   * Add a public key we want to monitor
+   * @param publicKey Ethereum public key as hex string
+   */
+  public void addMonitoredEtherPublicKey(String publicKey) {
+    String addressString = Hex.encodeHexString(org.ethereum.crypto.ECKey.fromPublicOnly(
+        org.spongycastle.util.encoders.Hex.decode(publicKey)).getAddress());
+    if (!addressString.startsWith("0x"))
+      addressString = "0x" + addressString;
     LOG.info("Add monitored Ethereum Address: {}", addressString);
-    monitoredAddresses.add(addressString.toLowerCase());
+    monitoredAddresses.put(addressString.toLowerCase(), publicKey);
   }
 
   public void start(Long startBlock) throws IOException {
@@ -76,12 +95,12 @@ class EthereumMonitor {
       web3.catchUpToLatestAndSubscribeToNewTransactionsObservable(
           new DefaultBlockParameterNumber(startBlock))
           .subscribe(tx -> {
-            if (monitoredAddresses.contains(tx.getTo())) {
+            if (monitoredAddresses.get(tx.getTo()) != null) {
               // Money was paid to a monitored address
-              fundsReceived(tx.getValue(), tx.getBlockNumber().longValue());
+              fundsReceived(tx.getTo(), tx.getValue(), tx.getBlockNumber().longValue());
             }
 
-            if (monitoredAddresses.contains(tx.getFrom().toLowerCase())) {
+            if (monitoredAddresses.get(tx.getFrom().toLowerCase()) != null) {
               // This should normally not happen as it means funds are stolen!
               LOG.error("WARN: Removed: {} wei from payin address", tx.getValue().toString());
             }
