@@ -6,9 +6,11 @@ import com.subgraph.orchid.encoders.Hex;
 import java.io.File;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.nio.file.Files;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -234,6 +236,17 @@ public class BitcoinMonitor {
         USDperBTC,
         address,
         email);
+
+    final String identifier = utxo.getParentTransaction().getHashAsString() + "_"
+        + String.valueOf(utxo.getIndex());
+    BigInteger value = new BigInteger(String.valueOf(satoshi));
+    Instant blockTime = Instant.ofEpochSecond(timestamp);
+    try {
+      userService.savePayIn(identifier, "BTC", value, USDperBTC, usdReceived, email );
+    } catch (SQLException e) {
+      LOG.error("Could not insert into pay in table: id:{} currency:{} fx-rate:{} USD:{} blockTime:{} email:{}",
+          identifier, "BTC", value, USDperBTC, usdReceived, blockTime, email);
+    }
 
     processedUTXOs.add(utxo);
     totalRaised = totalRaised.add(usdReceived);

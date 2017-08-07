@@ -32,7 +32,7 @@ public class ExchangeRateService {
     this.dataSource = dataSource;
   }
 
-  public BigDecimal getUSDperEther(Long blockHeight) throws SQLException {
+  public BigDecimal getUSDperETH(Long blockHeight) throws SQLException {
     try (
         Connection conn = dataSource.getConnection();
         PreparedStatement preparedStatement = conn.prepareStatement(
@@ -49,7 +49,7 @@ public class ExchangeRateService {
         if (rs.next()) {
           return new BigDecimal(rs.getString("rate_eth"));
         } else {
-          throw new RuntimeException("Result set empty from get exchange rate");
+          throw new RuntimeException("Result set empty from get exchange rate for eth");
         }
       }
     }
@@ -72,7 +72,7 @@ public class ExchangeRateService {
         if (rs.next()) {
           return new BigDecimal(rs.getString("rate_btc"));
         } else {
-          throw new RuntimeException("Result set empty from get exchange rate");
+          throw new RuntimeException("Result set empty from get exchange rate for btc");
         }
       }
     }
@@ -81,6 +81,6 @@ public class ExchangeRateService {
   public BigDecimal weiToUSD(BigInteger weiAmount, Long blockHeight) throws SQLException {
     BigDecimal wei = new BigDecimal(weiAmount);
     BigDecimal ethers = Convert.fromWei(wei, Unit.ETHER);
-    return ethers.multiply(getUSDperEther(blockHeight));
+    return ethers.multiply(getUSDperETH(blockHeight));
   }
 }

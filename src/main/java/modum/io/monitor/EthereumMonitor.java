@@ -39,15 +39,20 @@ class EthereumMonitor {
     this.web3 = Web3j.build(new HttpService(ipcPath));
   }
 
-  public void fundsReceived(String address, BigInteger wei, Long blockHeight) {
-    BigDecimal usd = null;
+  public void fundsReceived(String hash, String address, BigInteger wei, Long blockHeight) {
+    // Get exchange rate
+    BigDecimal USDperETH;
     try {
-      usd = fxService.weiToUSD(wei, blockHeight);
+      USDperETH = fxService.getUSDperETH(blockHeight);
     } catch (SQLException e) {
       LOG.error("Could not fetch exchange rate for ether block {}. {} {}",
           blockHeight, e.getMessage(), e.getCause());
       return;
     }
+    BigDecimal ethers = Convert.fromWei(new BigDecimal(wei), Unit.ETHER);
+    BigDecimal usdReceived = ethers.multiply(USDperETH);
+
+    // Get email of investor
     String email = null;
     try {
       email = userService.getEmailForEtherPublicKey(monitoredAddresses.get(address));
@@ -55,10 +60,17 @@ class EthereumMonitor {
       LOG.error("Could not fetch email address for public key {} / address {}. {} {}",
           monitoredAddresses.get(address), address, e.getMessage(), e.getCause());
     }
-    totalRaised = totalRaised.add(usd);
-    LOG.info("Payin: {} ether / {} USD / User: {} / Block: {}", Convert.fromWei(new BigDecimal(wei),
-        Unit.ETHER).toString(), usd, email, blockHeight);
-    LOG.info("New total: {} USD", totalRaised);
+
+    try {
+      userService.savePayIn(hash, "ETH", wei, USDperETH, usdReceived, email );
+    } catch (SQLException e) {
+      LOG.error("Could not insert into pay in table: id:{} currency:{} fx-rate:{} wei{} USD:{} email:{}",
+          hash, "BTC", USDperETH, wei, usdReceived, email);
+    }
+
+    LOG.info("Payin: {} ether / {} USD / User: {} / Block: {}", ethers, usdReceived, email, blockHeight);
+
+    totalRaised = totalRaised.add(usdReceived);
   }
 
   public Long getTotalRaisedUSD() {
@@ -95,9 +107,14 @@ class EthereumMonitor {
       web3.catchUpToLatestAndSubscribeToNewTransactionsObservable(
           new DefaultBlockParameterNumber(startBlock))
           .subscribe(tx -> {
+            LOG.info(tx.getBlockNumber().toString());
             if (monitoredAddresses.get(tx.getTo()) != null) {
               // Money was paid to a monitored address
-              fundsReceived(tx.getTo(), tx.getValue(), tx.getBlockNumber().longValue());
+              try {
+                fundsReceived(tx.getHash(), tx.getTo(), tx.getValue(), tx.getBlockNumber().longValue());
+              } catch (Throwable e) {
+                LOG.error("Error in fundsReceived: {} {}", e.getMessage(), e.getCause());
+              }
             }
 
             if (monitoredAddresses.get(tx.getFrom().toLowerCase()) != null) {

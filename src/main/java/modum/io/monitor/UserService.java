@@ -1,9 +1,13 @@
 package modum.io.monitor;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +52,29 @@ public class UserService {
           throw new RuntimeException("Result set empty from getEmailForBitcoinPublicKey");
         }
       }
+    }
+  }
+
+  public void savePayIn(String identifier, String currency, BigInteger value, BigDecimal fxRate,
+      BigDecimal usd, String email)
+      throws SQLException {
+    try (
+        Connection conn = dataSource.getConnection();
+        PreparedStatement preparedStatement = conn.prepareStatement(""
+            + "INSERT INTO payment_log (tx_identifier, creation_date, currency, paymentvalue, fx_rate,"
+            + "usd, email) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?)");
+    ) {
+      Timestamp now = Timestamp.from(Instant.now());
+      BigDecimal paymentValue = new BigDecimal(value);
+      preparedStatement.setString(1, identifier);
+      preparedStatement.setTimestamp(2, now);
+      preparedStatement.setString(3, currency);
+      preparedStatement.setBigDecimal(4, paymentValue);
+      preparedStatement.setBigDecimal(5, fxRate);
+      preparedStatement.setBigDecimal(6, usd);
+      preparedStatement.setString(7, email);
+      preparedStatement.execute();
     }
   }
 
