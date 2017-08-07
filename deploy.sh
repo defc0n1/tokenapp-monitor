@@ -1,7 +1,6 @@
 #!/bin/bash
 
-#servers to deploy to and jumphost for the tunnel
-SERVERS=( "tokenapp1.modum.intern" )
+MONITOR_SERVER="monitorapp1.modum.intern"
 JUMP_HOST="jump.modum.io"
 
 #if only one key is provided, both servers have the same key
@@ -29,16 +28,16 @@ if ! gradle clean distTar; then
 fi
 
 # Deployment
-#
-# Make sure to have a systemd init script as found in: https://docs.spring.io/spring-boot/docs/current/reference/html/deployment-install.html
+echo "Uploading tar file"
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
+scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -r -i "$PRIV_PROXY" -P 1337 build/distributions/monitoring-1.0-SNAPSHOT.tar ubuntu@localhost:/var/lib/monitoring/monitoring.tar
+sleep 3
 
-for i in "${SERVERS[@]}"
-do
-    #http://www.g-loaded.eu/2006/11/24/auto-closing-ssh-tunnels/
-    ssh -f -L 1234:"$i":22 -i "$PRIV_PROXY" ubuntu@"$JUMP_HOST" sleep 25; \
-    #access the tokenapp server
-    #ssh -i priv.key -p 1234 ubuntu@localhost
-    scp -r -i "$PRIV_APP" -P 1234 build/distributions/monitoring-1.0-SNAPSHOT.tar ubuntu@localhost:/var/lib/monitoring/monitoring.tar
-    ssh -i "$PRIV_APP" -p 1234 ubuntu@localhost tar xf /var/lib/monitoring/monitoring.tar -C /var/lib/monitoring
-    ssh -i "$PRIV_APP" -p 1234 ubuntu@localhost sudo systemctl restart monitoring.service
-done
+echo "Unpacking tar"
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
+ssh -i "$PRIV_PROXY" -p 1337 ubuntu@localhost tar xf /var/lib/monitoring/monitoring.tar -C /var/lib/monitoring
+sleep 3
+
+echo "Restarting rates service"
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -i "$PRIV_PROXY" -p 1337 ubuntu@localhost sudo systemctl restart monitoring.service
