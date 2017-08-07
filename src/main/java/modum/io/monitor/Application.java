@@ -82,7 +82,7 @@ public class Application {
 
   private void initMonitors() throws Exception {
     ethereumMonitor = new EthereumMonitor(userService, fxService, ETHER_FULLNODE_URL);
-    bitcoinMonitor = new BitcoinMonitor(fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
+    bitcoinMonitor = new BitcoinMonitor(userService, fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
 
     databaseWatcher = new DatabaseWatcher(databaseSource,
         newBitcoinAddress -> {

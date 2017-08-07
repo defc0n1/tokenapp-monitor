@@ -52,8 +52,8 @@ class EthereumMonitor {
     try {
       email = userService.getEmailForEtherPublicKey(monitoredAddresses.get(address));
     } catch (SQLException e) {
-      LOG.error("Could not fetch email address {}. {} {}",
-          address, e.getMessage(), e.getCause());
+      LOG.error("Could not fetch email address for public key {} / address {}. {} {}",
+          monitoredAddresses.get(address), address, e.getMessage(), e.getCause());
     }
     totalRaised = totalRaised.add(usd);
     LOG.info("Payin: {} ether / {} USD / User: {} / Block: {}", Convert.fromWei(new BigDecimal(wei),

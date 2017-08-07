@@ -10,7 +10,9 @@ import java.net.Inet4Address;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.bitcoinj.core.Address;
@@ -48,12 +50,16 @@ public class BitcoinMonitor {
   private final PeerGroup peerGroup;
   private final SPVBlockStore blockStore;
   private final ExchangeRateService fxService;
+  private final UserService userService;
   private Set<TransactionOutput> processedUTXOs = new HashSet<>();
+  private Map<String, String> monitoredAddresses = new HashMap<>(); // public key -> address
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public BitcoinMonitor(ExchangeRateService fxService, String bitcoinNetwork) throws Exception {
+  public BitcoinMonitor(UserService userService, ExchangeRateService fxService,
+      String bitcoinNetwork) throws Exception {
     this.fxService = fxService;
     chainParams = BitcoinNet.getNetworkParams(BitcoinNet.of(bitcoinNetwork));
+    this.userService = userService;
     context = new Context(chainParams);
     File blockStoreFile = Files.createTempFile("chain", "tmp").toFile();
     blockStoreFile.deleteOnExit();
@@ -100,6 +106,7 @@ public class BitcoinMonitor {
     final String addressString = address.toBase58();
     LOG.info("Add monitored Bitcoin Address: {}", addressString);
     wallet.addWatchedAddress(address, timestamp);
+    monitoredAddresses.put(addressString, publicKey);
   }
 
   public Long getTotalRaisedUSD() {
@@ -175,6 +182,7 @@ public class BitcoinMonitor {
    */
   private void coinsReceived(TransactionOutput utxo) {
     long satoshi = utxo.getValue().getValue();
+    final String address = utxo.getAddressFromP2PKHScript(chainParams).toBase58();
 
     // Retrieve the timestamp from the first block that this transaction was seen in
     long timestamp = utxo.getParentTransaction().getAppearsInHashes().keySet().stream()
@@ -189,25 +197,43 @@ public class BitcoinMonitor {
         .map(StoredBlock::getHeader)
         .map(Block::getTime)
         .mapToLong(date -> (date.getTime() / 1000L))
-        .min().orElseThrow(() -> new RuntimeException("Could not get time of block"));
+        .min().orElse(0L);
+    if (timestamp == 0L) {
+      LOG.error("Could not get time for utxo in tx {} with satoshi value {}",
+          address, satoshi);
+      return;
+    }
 
+    // Calculate USD value
     BigDecimal USDperBTC = null;
     try {
       USDperBTC = fxService.getUSDPerBTC(timestamp);
     } catch (SQLException e) {
       LOG.error("Could not fetch exchange rate for utxo in tx {} with satoshi value {}. {} {}",
-          utxo.getParentTransaction().getHashAsString(), satoshi, e.getMessage(), e.getCause());
+          address, satoshi, e.getMessage(), e.getCause());
+      return;
     }
     BigDecimal usdReceived = BigDecimal.valueOf(satoshi)
         .multiply(USDperBTC)
         .divide(BigDecimal.valueOf(100_000_000L), BigDecimal.ROUND_DOWN);
 
-    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid",
+    // Fetch email
+    String publicKey = monitoredAddresses.get(address);
+    String email = null;
+    try {
+      email = userService.getEmailForBitcoinPublicKey(publicKey);
+    } catch (SQLException e) {
+      LOG.error("Could not fetch email address for public key {} / address {}. {} {}",
+          publicKey, address, e.getMessage(), e.getCause());
+    }
+
+    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid / {} email",
         usdReceived,
         utxo.getValue(),
         timestamp,
         USDperBTC,
-        utxo.getParentTransaction().getHashAsString());
+        address,
+        email);
 
     processedUTXOs.add(utxo);
     totalRaised = totalRaised.add(usdReceived);

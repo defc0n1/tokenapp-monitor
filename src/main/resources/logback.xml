@@ -5,7 +5,7 @@
     </encoder>
   </appender>
 
-  <logger name="org.bitcoinj" level="WARN" />
+  <logger name="org.bitcoinj" level="ERROR" />
 
   <root level="INFO">
     <appender-ref ref="STDOUT" />
