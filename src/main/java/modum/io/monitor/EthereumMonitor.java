@@ -9,9 +9,9 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.spongycastle.util.encoders.Hex;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.response.EthBlock.Block;
@@ -100,8 +100,7 @@ class EthereumMonitor {
    * @param publicKey Ethereum public key as hex string
    */
   public void addMonitoredEtherPublicKey(String publicKey) {
-    String addressString = Hex.encodeHexString(org.ethereum.crypto.ECKey.fromPublicOnly(
-        org.spongycastle.util.encoders.Hex.decode(publicKey)).getAddress());
+    String addressString = Hex.toHexString(org.ethereum.crypto.ECKey.fromPublicOnly( Hex.decode(publicKey)).getAddress());
     if (!addressString.startsWith("0x"))
       addressString = "0x" + addressString;
     LOG.info("Add monitored Ethereum Address: {}", addressString);
