@@ -22,20 +22,15 @@ if [ ! -f "$PRIV_APP" ]; then
 fi
 
 #Build and install of the frontend
-if ! gradle clean distTar; then
+if ! gradle clean assembleShadowDist; then
     echo "gradle build failed"
     exit 1
 fi
 
 # Deployment
-echo "Uploading tar file"
+echo "Uploading jar file"
 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
-scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -r -i "$PRIV_PROXY" -P 1337 build/distributions/monitoring-1.0-SNAPSHOT.tar ubuntu@localhost:/var/lib/monitoring/monitoring.tar
-sleep 3
-
-echo "Unpacking tar"
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
-ssh -i "$PRIV_PROXY" -p 1337 ubuntu@localhost tar xf /var/lib/monitoring/monitoring.tar -C /var/lib/monitoring
+scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -r -i "$PRIV_PROXY" -P 1337 build/libs/monitoring.jar ubuntu@localhost:/var/lib/monitoring/monitoring.jar
 sleep 3
 
 echo "Restarting rates service"
