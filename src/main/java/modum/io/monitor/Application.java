@@ -23,6 +23,10 @@ public class Application {
   private final String JDBC_URL;
   private final String DATASOURCE_USERNAME;
   private final String DATASOURCE_PASSWORD;
+  private final String MODUM_TOKENAPP_EMAIL_USERNAME;
+  private final String MODUM_TOKENAPP_EMAIL_PASSWORD;
+  private final String MODUM_TOKENAPP_EMAIL_HOST;
+  private final String MODUM_TOKENAPP_EMAIL_PORT;
   private boolean MODUM_TOKENAPP_ENABLE_CORS;
   private boolean MODUM_TOKENAPP_CREATE_SCHEMA;
 
@@ -30,6 +34,7 @@ public class Application {
   private BitcoinMonitor bitcoinMonitor;
   private ExchangeRateService fxService;
   private UserService userService;
+  private MailService mailService;
   private HikariDataSource databaseSource;
   private DatabaseWatcher databaseWatcher;
 
@@ -39,6 +44,14 @@ public class Application {
         .orElseThrow(() -> new IllegalArgumentException("Missing env variable: ETHER_FULLNODE_URL"));
     JDBC_URL = Optional.ofNullable(System.getenv("JDBC_URL"))
         .orElseThrow(() -> new IllegalArgumentException("Missing env variable: JDBC_URL"));
+    MODUM_TOKENAPP_EMAIL_USERNAME = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_USERNAME"))
+        .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_USERNAME"));
+    MODUM_TOKENAPP_EMAIL_PASSWORD = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_PASSWORD"))
+        .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_PASSWORD"));
+    MODUM_TOKENAPP_EMAIL_HOST = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_HOST"))
+        .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_HOST"));
+    MODUM_TOKENAPP_EMAIL_PORT = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_PORT"))
+        .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_PORT"));
 
     // Optional configurations
     DATASOURCE_USERNAME = System.getenv("DATASOURCE_USERNAME");
@@ -60,12 +73,18 @@ public class Application {
       initDatabase();
       initExchangeRateService();
       initUserService();
+      initEmailService();
       initMonitors();
       initRoutes();
     } catch (HttpHostConnectException e) {
       LOG.error("Could not connect to ethereum fullnode on {}: {}", ETHER_FULLNODE_URL, e.getMessage());
       System.exit(1);
     }
+  }
+
+  private void initEmailService() {
+    mailService = new MailService(MODUM_TOKENAPP_EMAIL_HOST, MODUM_TOKENAPP_EMAIL_PORT,
+        MODUM_TOKENAPP_EMAIL_USERNAME, MODUM_TOKENAPP_EMAIL_PASSWORD);
   }
 
   private void initUserService() {
@@ -81,8 +100,8 @@ public class Application {
   }
 
   private void initMonitors() throws Exception {
-    ethereumMonitor = new EthereumMonitor(userService, fxService, ETHER_FULLNODE_URL);
-    bitcoinMonitor = new BitcoinMonitor(userService, fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
+    ethereumMonitor = new EthereumMonitor(userService, mailService, fxService, ETHER_FULLNODE_URL);
+    bitcoinMonitor = new BitcoinMonitor(userService, mailService, fxService, MODUM_TOKENAPP_BITCOIN_NETWORK);
 
     databaseWatcher = new DatabaseWatcher(databaseSource,
         newBitcoinAddress -> {

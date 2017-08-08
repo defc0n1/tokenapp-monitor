@@ -17,12 +17,14 @@ repositories {
 
 dependencies {
     compile group: 'com.sparkjava', name: 'spark-core', version: '2.6.0'
+
     compile group: 'org.bitcoinj', name: 'bitcoinj-core', version: '0.14.4'
     compile group: 'org.ethereum', name: 'ethereumj-core', version: '1.5.+'
     compile group: 'org.web3j', name: 'core', version: '2.2.2'
 
+    compile 'org.springframework.boot:spring-boot-starter-mail:1.5.6.RELEASE'
+
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
-    runtime group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
 
     compile group: 'com.zaxxer', name: 'HikariCP', version: '2.6.3'
     compile group: 'org.postgresql', name: 'postgresql', version: '42.1.3'

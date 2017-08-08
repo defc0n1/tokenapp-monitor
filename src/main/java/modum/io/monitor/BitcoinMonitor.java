@@ -53,15 +53,19 @@ public class BitcoinMonitor {
   private final SPVBlockStore blockStore;
   private final ExchangeRateService fxService;
   private final UserService userService;
+  private final MailService mailService;
   private Set<TransactionOutput> processedUTXOs = new HashSet<>();
   private Map<String, String> monitoredAddresses = new HashMap<>(); // public key -> address
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public BitcoinMonitor(UserService userService, ExchangeRateService fxService,
+  public BitcoinMonitor(UserService userService, MailService mailService,
+      ExchangeRateService fxService,
       String bitcoinNetwork) throws Exception {
     this.fxService = fxService;
-    chainParams = BitcoinNet.getNetworkParams(BitcoinNet.of(bitcoinNetwork));
     this.userService = userService;
+    this.mailService = mailService;
+
+    chainParams = BitcoinNet.getNetworkParams(BitcoinNet.of(bitcoinNetwork));
     context = new Context(chainParams);
     File blockStoreFile = Files.createTempFile("chain", "tmp").toFile();
     blockStoreFile.deleteOnExit();
@@ -245,6 +249,10 @@ public class BitcoinMonitor {
           email,
           timestamp,
           address);
+    }
+
+    if (inserted) {
+      mailService.sendConfirmationMail(email, utxo.getValue().toFriendlyString());
     }
 
     LOG.info("Payin: new:{} / {} / {} USD / {} FX / {} / Time: {] / Address: {}",

@@ -28,13 +28,16 @@ class EthereumMonitor {
 
   private final Web3j web3;
   private final ExchangeRateService fxService;
+  private final MailService mailService;
   private final UserService userService;
   private boolean started = false;
   private Map<String, String> monitoredAddresses = new HashMap<>(); // public key -> address
   private BigDecimal totalRaised = BigDecimal.ZERO;
 
-  public EthereumMonitor(UserService userService, ExchangeRateService fxService, String ipcPath) {
+  public EthereumMonitor(UserService userService, MailService mailService,
+      ExchangeRateService fxService, String ipcPath) {
     this.userService = userService;
+    this.mailService = mailService;
     this.fxService = fxService;
     this.web3 = Web3j.build(new HttpService(ipcPath));
   }
@@ -71,6 +74,10 @@ class EthereumMonitor {
           USDperETH,
           email,
           blockHeight);
+    }
+
+    if (inserted) {
+      mailService.sendConfirmationMail(email, ethers.toString() + " ETH");
     }
 
     LOG.info("Payin: new:{} / {} ETH / {} USD / {} FX / {} / Block: {}",
