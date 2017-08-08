@@ -61,14 +61,25 @@ class EthereumMonitor {
           monitoredAddresses.get(address), address, e.getMessage(), e.getCause());
     }
 
+    boolean inserted = false;
     try {
-      userService.savePayIn(hash, "ETH", wei, USDperETH, usdReceived, email );
+      inserted = userService.savePayIn(hash, "ETH", wei, USDperETH, usdReceived, email );
     } catch (SQLException e) {
-      LOG.error("Could not insert into pay in table: id:{} currency:{} fx-rate:{} wei{} USD:{} email:{}",
-          hash, "BTC", USDperETH, wei, usdReceived, email);
+      LOG.info("Could not save payin: {} ETH / {} USD / {} FX / {} / Block: {}",
+          ethers,
+          usdReceived,
+          USDperETH,
+          email,
+          blockHeight);
     }
 
-    LOG.info("Payin: {} ether / {} USD / User: {} / Block: {}", ethers, usdReceived, email, blockHeight);
+    LOG.info("Payin: new:{} / {} ETH / {} USD / {} FX / {} / Block: {}",
+        inserted,
+        ethers,
+        usdReceived,
+        USDperETH,
+        email,
+        blockHeight);
 
     totalRaised = totalRaised.add(usdReceived);
   }

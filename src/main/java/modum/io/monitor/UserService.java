@@ -55,7 +55,12 @@ public class UserService {
     }
   }
 
-  public void savePayIn(String identifier, String currency, BigInteger value, BigDecimal fxRate,
+  /**
+   * Insert intso payment_log table
+   * @return true, when the insert was successful. false when the payment was already registered.
+   * @throws SQLException
+   */
+  public boolean savePayIn(String identifier, String currency, BigInteger value, BigDecimal fxRate,
       BigDecimal usd, String email)
       throws SQLException {
     try (
@@ -63,7 +68,8 @@ public class UserService {
         PreparedStatement preparedStatement = conn.prepareStatement(""
             + "INSERT INTO payment_log (tx_identifier, creation_date, currency, paymentvalue, fx_rate,"
             + "usd, email) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?)");
+            + "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            + "ON CONFLICT DO NOTHING RETURNING TRUE");
     ) {
       Timestamp now = Timestamp.from(Instant.now());
       BigDecimal paymentValue = new BigDecimal(value);
@@ -74,7 +80,8 @@ public class UserService {
       preparedStatement.setBigDecimal(5, fxRate);
       preparedStatement.setBigDecimal(6, usd);
       preparedStatement.setString(7, email);
-      preparedStatement.execute();
+      boolean inserted = preparedStatement.executeQuery().next();
+      return inserted;
     }
   }
 

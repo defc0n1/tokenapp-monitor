@@ -229,24 +229,32 @@ public class BitcoinMonitor {
           publicKey, address, e.getMessage(), e.getCause());
     }
 
-    LOG.info("Received {} USD / {} satoshi / {} timestamp / {} fx-rate / {} txid / {} email",
-        usdReceived,
-        utxo.getValue(),
-        timestamp,
-        USDperBTC,
-        address,
-        email);
 
     final String identifier = utxo.getParentTransaction().getHashAsString() + "_"
         + String.valueOf(utxo.getIndex());
     BigInteger value = new BigInteger(String.valueOf(satoshi));
     Instant blockTime = Instant.ofEpochSecond(timestamp);
+    boolean inserted = false;
     try {
-      userService.savePayIn(identifier, "BTC", value, USDperBTC, usdReceived, email );
+      inserted = userService.savePayIn(identifier, "BTC", value, USDperBTC, usdReceived, email );
     } catch (SQLException e) {
-      LOG.error("Could not insert into pay in table: id:{} currency:{} fx-rate:{} USD:{} blockTime:{} email:{}",
-          identifier, "BTC", value, USDperBTC, usdReceived, blockTime, email);
+      LOG.error("Could not save payin: {} / {} USD / {} FX / {} / Time: {] / Address: {}",
+          utxo.getValue().toFriendlyString(),
+          usdReceived,
+          USDperBTC,
+          email,
+          timestamp,
+          address);
     }
+
+    LOG.info("Payin: new:{} / {} / {} USD / {} FX / {} / Time: {] / Address: {}",
+        inserted,
+        utxo.getValue().toFriendlyString(),
+        usdReceived,
+        USDperBTC,
+        email,
+        timestamp,
+        address);
 
     processedUTXOs.add(utxo);
     totalRaised = totalRaised.add(usdReceived);
