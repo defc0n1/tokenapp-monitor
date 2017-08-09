@@ -27,6 +27,7 @@ public class Application {
   private final String MODUM_TOKENAPP_EMAIL_PASSWORD;
   private final String MODUM_TOKENAPP_EMAIL_HOST;
   private final String MODUM_TOKENAPP_EMAIL_PORT;
+  private final String MODUM_TOKENAPP_EMAIL_BCC;
   private boolean MODUM_TOKENAPP_ENABLE_CORS;
   private boolean MODUM_TOKENAPP_CREATE_SCHEMA;
 
@@ -52,6 +53,8 @@ public class Application {
         .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_HOST"));
     MODUM_TOKENAPP_EMAIL_PORT = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_PORT"))
         .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_PORT"));
+    MODUM_TOKENAPP_EMAIL_BCC = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_EMAIL_BCC"))
+        .orElseThrow(() -> new IllegalArgumentException("Missing env variable: MODUM_TOKENAPP_EMAIL_BCC"));
 
     // Optional configurations
     DATASOURCE_USERNAME = System.getenv("DATASOURCE_USERNAME");
@@ -84,7 +87,7 @@ public class Application {
 
   private void initEmailService() {
     mailService = new MailService(MODUM_TOKENAPP_EMAIL_HOST, MODUM_TOKENAPP_EMAIL_PORT,
-        MODUM_TOKENAPP_EMAIL_USERNAME, MODUM_TOKENAPP_EMAIL_PASSWORD);
+        MODUM_TOKENAPP_EMAIL_USERNAME, MODUM_TOKENAPP_EMAIL_PASSWORD, MODUM_TOKENAPP_EMAIL_BCC);
   }
 
   private void initUserService() {

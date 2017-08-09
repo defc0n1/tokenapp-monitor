@@ -19,8 +19,10 @@ public class MailService {
 
   private final JavaMailSenderImpl javaMailSender;
   private final TemplateEngine templateEngine;
+  private final String bccAddress;
 
-  public MailService(String host, String port, String user, String password) {
+  public MailService(String host, String port, String user, String password,
+      String bccAddress) {
     javaMailSender = new JavaMailSenderImpl();
     javaMailSender.setUsername(user);
     javaMailSender.setPassword(password);
@@ -33,9 +35,9 @@ public class MailService {
     properties.setProperty("mail.smtp.port", port);
     properties.setProperty("mail.smtp.ssl.trust", "*");
     javaMailSender.setJavaMailProperties(properties);
-
     templateEngine = new TemplateEngine();
     templateEngine.setTemplateResolver(new ClassLoaderTemplateResolver());
+    this.bccAddress = bccAddress;
   }
 
   public void sendConfirmationMail(String email, String amount) {
@@ -45,6 +47,7 @@ public class MailService {
       messageHelper.setSubject("Payment received");
       messageHelper.setFrom("token@modum.io");
       messageHelper.setTo(email);
+      messageHelper.setBcc(bccAddress);
       setEmailContent(messageHelper, amount);
       javaMailSender.send(messageHelper.getMimeMessage());
     } catch (MessagingException | IOException e) {
