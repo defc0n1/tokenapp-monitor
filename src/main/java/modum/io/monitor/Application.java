@@ -28,6 +28,7 @@ public class Application {
   private final String MODUM_TOKENAPP_EMAIL_HOST;
   private final String MODUM_TOKENAPP_EMAIL_PORT;
   private final String MODUM_TOKENAPP_EMAIL_BCC;
+  private final Long MODUM_TOKENAPP_START_AMOUNT;
   private boolean MODUM_TOKENAPP_ENABLE_CORS;
   private boolean MODUM_TOKENAPP_CREATE_SCHEMA;
 
@@ -63,7 +64,7 @@ public class Application {
     MODUM_TOKENAPP_ENABLE_CORS = Boolean.parseBoolean(Optional.ofNullable(System.getenv("MODUM_TOKENAPP_ENABLE_CORS")).orElse("false"));
     MODUM_TOKENAPP_BITCOIN_NETWORK = Optional.ofNullable(System.getenv("MODUM_TOKENAPP_BITCOIN_NETWORK")).orElse("mainnet");
     START_BLOCK = Long.valueOf(Optional.ofNullable(System.getenv("START_BLOCK_ETHER")).orElse("1"));
-
+    MODUM_TOKENAPP_START_AMOUNT = Long.valueOf(Optional.ofNullable(System.getenv("MODUM_TOKENAPP_START_AMOUNT")).orElse("0"));
   }
 
   public static void main(String[] args) throws Exception {
@@ -182,7 +183,7 @@ public class Application {
   }
 
   private Long getTotalRaisedUSD() {
-    return ethereumMonitor.getTotalRaisedUSD() + bitcoinMonitor.getTotalRaisedUSD();
+    return ethereumMonitor.getTotalRaisedUSD() + bitcoinMonitor.getTotalRaisedUSD() + MODUM_TOKENAPP_START_AMOUNT;
   }
 
 }
