@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MONITOR_SERVER="monitorapp1.modum.intern"
-JUMP_HOST="jump.modum.io"
+JUMP_HOST="jump1.modum.io"
 
 #if only one key is provided, both servers have the same key
 PRIV_PROXY=$1
@@ -30,9 +30,9 @@ fi
 # Deployment
 echo "Uploading jar file"
 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
-scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -r -i "$PRIV_PROXY" -P 1337 build/libs/monitoring.jar ubuntu@localhost:/var/lib/monitoring/monitoring.jar
+scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -r -i "$PRIV_APP" -P 1337 build/libs/monitoring.jar ubuntu@localhost:/var/lib/monitoring/monitoring.jar
 sleep 3
 
 echo "Restarting rates service"
 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -f -L 1337:"$MONITOR_SERVER":22 -i "$PRIV_PROXY" -p 2202 ubuntu@"$JUMP_HOST" sleep 3;
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -i "$PRIV_PROXY" -p 1337 ubuntu@localhost sudo systemctl restart monitoring.service
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  -i "$PRIV_APP" -p 1337 ubuntu@localhost sudo systemctl restart monitoring.service
