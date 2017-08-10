@@ -80,7 +80,11 @@ img[class="img1"] { width: 100% !important; height: auto !important; }
                             <!--content-->
                             <tr align="center">
                               <td style="font-family:Open sans, Arial, Sans-serif; font-size:14px; color:#808E8E;line-height:28px;">We successfully received a payment of <span th:text="${amount}" /></td>
-                              </tr>
+
+                            </tr>
+                            <tr align="center">
+                              <td><a th:href="${link}">Track transaction</a></td>
+                            </tr>
                             <!--end content-->
                             <tr>
                               <td height="20"></td>

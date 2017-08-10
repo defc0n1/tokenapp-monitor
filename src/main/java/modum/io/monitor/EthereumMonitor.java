@@ -77,7 +77,8 @@ class EthereumMonitor {
     }
 
     if (inserted) {
-      mailService.sendConfirmationMail(email, ethers.toString() + " ETH");
+      final String etherscanLink = "https://etherscan.io/tx/" + hash;
+      mailService.sendConfirmationMail(email, ethers.toString() + " ETH", etherscanLink);
     }
 
     LOG.info("Payin: new:{} / {} ETH / {} USD / {} FX / {} / Block: {}",

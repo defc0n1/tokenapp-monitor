@@ -40,7 +40,7 @@ public class MailService {
     this.bccAddress = bccAddress;
   }
 
-  public void sendConfirmationMail(String email, String amount) {
+  public void sendConfirmationMail(String email, String amount, String link) {
     LOG.info("Sending confirmation mail to {}: payment of {}", email, amount);
     try {
       MimeMessageHelper messageHelper = new MimeMessageHelper(javaMailSender.createMimeMessage(), true, "UTF-8");
@@ -48,17 +48,18 @@ public class MailService {
       messageHelper.setFrom("token@modum.io");
       messageHelper.setTo(email);
       messageHelper.setBcc(bccAddress);
-      setEmailContent(messageHelper, amount);
+      setEmailContent(messageHelper, amount, link);
       javaMailSender.send(messageHelper.getMimeMessage());
     } catch (MessagingException | IOException e) {
       LOG.error("Could not send email to {}. Error: {} {}", email, e.getMessage(), e.getCause());
     }
   }
 
-  public void setEmailContent(MimeMessageHelper messageHelper, String amount)
+  public void setEmailContent(MimeMessageHelper messageHelper, String amount, String link)
       throws MessagingException, IOException {
     Context context = new Context();
     context.setVariable("amount", amount);
+    context.setVariable("link", link);
     String html5Content = templateEngine.process("templates/confirmation_email.html", context);
     messageHelper.setText(html5Content, true);
 

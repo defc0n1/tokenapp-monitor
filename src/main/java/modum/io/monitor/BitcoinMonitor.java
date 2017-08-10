@@ -146,7 +146,6 @@ public class BitcoinMonitor {
       Context.propagate(context);
       // Check outputs
       tx.getOutputs().forEach(utxo -> {
-
         // If not already processed and this output sends to one of our watched addresses
         if (!processedUTXOs.contains(utxo) && utxo.getScriptPubKey().isSentToAddress()) {
           Address address = utxo.getAddressFromP2PKHScript(chainParams);
@@ -240,7 +239,7 @@ public class BitcoinMonitor {
     Instant blockTime = Instant.ofEpochSecond(timestamp);
     boolean inserted = false;
     try {
-      inserted = userService.savePayIn(identifier, "BTC", value, USDperBTC, usdReceived, email );
+      inserted = userService.savePayIn(identifier, "BTC", value, USDperBTC, usdReceived, email);
     } catch (SQLException e) {
       LOG.error("Could not save payin: {} / {} USD / {} FX / {} / Time: {] / Address: {}",
           utxo.getValue().toFriendlyString(),
@@ -252,7 +251,8 @@ public class BitcoinMonitor {
     }
 
     if (inserted) {
-      mailService.sendConfirmationMail(email, utxo.getValue().toFriendlyString());
+      final String blockChainInfoLink = "https://blockchain.info/tx/" + utxo.getParentTransaction().getHashAsString();
+      mailService.sendConfirmationMail(email, utxo.getValue().toFriendlyString(), blockChainInfoLink);
     }
 
     LOG.info("Payin: new:{} / {} / {} USD / {} FX / {} / Time: {] / Address: {}",
