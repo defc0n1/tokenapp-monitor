@@ -79,11 +79,8 @@ img[class="img1"] { width: 100% !important; height: auto !important; }
                             </tr>
                             <!--content-->
                             <tr align="center">
-                              <td style="font-family:Open sans, Arial, Sans-serif; font-size:14px; color:#808E8E;line-height:28px;">We successfully received a payment of <span th:text="${amount}" /></td>
+                              <td style="font-family:Open sans, Arial, Sans-serif; font-size:14px; color:#808E8E;line-height:28px;">We successfully received a payment your <span th:text="${amount}" /></td>
 
-                            </tr>
-                            <tr align="center">
-                              <td><a th:href="${link}">Track transaction</a></td>
                             </tr>
                             <!--end content-->
                             <tr>
@@ -94,7 +91,7 @@ img[class="img1"] { width: 100% !important; height: auto !important; }
                               <td>
                                 <table border="0" align="center" cellpadding="0" cellspacing="0" bgcolor="#00537E" class="textbutton" style="border-radius:4px;border-bottom:2px solid #DDDDDD;">
                                   <tr>
-                                    <td class="btn-link" height="40" align="center" style="font-family:Open sans, Arial, Sans-serif; font-size:14px; color:#ffffff;;padding-left:20px;padding-right:20px;"><a href="https://www.modum.io/tokensale">More Info</a></td>
+                                    <td class="btn-link" height="40" align="center" style="font-family:Open sans, Arial, Sans-serif; font-size:14px; color:#ffffff;;padding-left:20px;padding-right:20px;"><a th:href="${link}">Track transaction</a></td>
                                   </tr>
                                 </table>
                               </td>
